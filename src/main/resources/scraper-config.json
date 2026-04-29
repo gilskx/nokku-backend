@@ -1,0 +1,68 @@
+{
+  "amazon": {
+    "type": "generic",
+    "baseUrl": "https://www.amazon.com",
+    "searchUrl": "https://www.amazon.com/s?k=",
+    "itemSelectors": [
+      "div[data-component-type=s-search-result]",
+      "div.s-result-item[data-asin]"
+    ],
+    "nameSelectors": [
+      "h2 span"
+    ],
+    "priceSelectors": [
+      ".a-price-whole",
+      ".a-offscreen"
+    ],
+    "imageSelectors": [
+      "img.s-image"
+    ],
+    "nameSelector": "h2 span",
+    "priceSelector": ".a-price-whole",
+    "imageSelector": "img.s-image",
+    "ratingSelector": ".a-icon-alt",
+    "linkSelector": "h2 a.a-link-normal"
+  },
+
+  "walmart": {
+    "type": "json"
+  },
+
+  "ebay": {
+    "type": "api"
+  },
+
+  "newegg": {
+    "type": "generic",
+    "searchUrl": "https://www.newegg.com/p/pl?d=",
+    "baseUrl": "https://www.newegg.com",
+    "itemSelectors": [
+      "div.item-cell"
+    ],
+    "nameSelectors": [
+      "a.item-title"
+    ],
+    "priceSelector": "li.price-current",
+    "linkSelector": "a.item-title",
+    "imageSelector": "img"
+  },
+
+  "google-shopping": {
+    "type": "google-shopping-api"
+  },
+
+  "selectionRules": [
+    {
+      "condition": { "intentType": "budget" },
+      "sources": ["ebay", "walmart"]
+    },
+    {
+      "condition": { "intentType": "premium" },
+      "sources": ["amazon", "target"]
+    },
+    {
+      "condition": { "intentType": "balanced" },
+      "sources": ["amazon", "walmart", "ebay"]
+    }
+  ]
+}
