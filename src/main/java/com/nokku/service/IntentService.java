@@ -86,6 +86,7 @@ public class IntentService {
 
             return result;
 
+
         } catch (Exception e) {
             System.out.println("⚠️ Intent AI failed, using fallback intent: " + e.getMessage());
 

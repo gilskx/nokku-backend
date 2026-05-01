@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class AiRankingService {
@@ -33,7 +34,7 @@ public class AiRankingService {
     // =========================================================
     public Map<String, Object> rankWithMeta(String query, List<Product> products) {
 
-        List<Product> top = products.stream().limit(21).toList();
+        List<Product> top = diversify(products, 30);
 
         try {
     
@@ -575,6 +576,31 @@ OUTPUT FORMAT (STRICT JSON ONLY):
 
         result.put("price_value_signal", "Balanced choice based on rating and price");
         result.put("key_difference", "Price vs performance trade-off");
+
+
+        return result;
+    }
+    private List<Product> diversify(List<Product> products, int limit) {
+
+        Map<String, List<Product>> grouped = products.stream()
+                .collect(Collectors.groupingBy(Product::getSource, LinkedHashMap::new, Collectors.toList()));
+
+        List<Product> result = new ArrayList<>();
+
+        int i = 0;
+        while (result.size() < limit) {
+            boolean added = false;
+
+            for (List<Product> list : grouped.values()) {
+                if (i < list.size()) {
+                    result.add(list.get(i));
+                    added = true;
+                }
+            }
+
+            if (!added) break;
+            i++;
+        }
 
         return result;
     }

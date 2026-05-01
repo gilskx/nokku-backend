@@ -63,7 +63,7 @@ public class GenericScraper {
                     .header("Accept-Language", "en-US,en;q=0.9")
                     .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9")
                     .header("Connection", "keep-alive")
-                    .timeout(20000)
+                    .timeout(10000)
                     .get();
 
             if (doc.title().toLowerCase().contains("robot")) {
