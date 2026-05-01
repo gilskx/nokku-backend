@@ -18,7 +18,7 @@
       "img.s-image"
     ],
     "nameSelector": "h2 span",
-    "priceSelector": ".a-price-whole",
+    "priceSelector": ".a-offscreen",
     "imageSelector": "img.s-image",
     "ratingSelector": ".a-icon-alt",
     "linkSelector": "h2 a.a-link-normal"

@@ -12,6 +12,8 @@ import com.nokku.service.ScoringService;
 import org.springframework.web.bind.annotation.*;
 import com.nokku.service.AiRankingService;
 import java.util.*;
+import java.util.stream.Collectors;
+
 import org.springframework.http.MediaType;
 import reactor.core.publisher.Flux;
 import com.nokku.orchestrator.model.Plan;
@@ -294,18 +296,49 @@ return Flux.create(emitter -> {
                     List<String> sources = plan.getSources();
 
                     List<Product> products = executor.execute(sources, intent, listener);
+                ///KKKKK
+                    products = products.stream()
+                            .sorted(Comparator
+                                    .comparingDouble(Product::getPrice)
+                                    .thenComparing(Product::getRating)
+                                    .thenComparing(Product::getSource)
+                            )
+                            .toList();
 
-                    System.out.println("🔥 Controller PRODUCTS SIZE: " + products.size());
-
+                    System.out.println("🧪 [EXECUTOR OUTPUT]");
+                    products.forEach(p -> System.out.println("SRC=" + p.getSource() + " | " + p.getName()));
                     Map<String, Object> selection = new HashMap<>();
                     String explanation = "";
 
                     // 🔥 FIX 1: DECLARE aiMeta OUTSIDE
                     Map<String, Object> aiMeta = new HashMap<>();
-
+                    List<Product> rankedProducts = new ArrayList<>(products);
                     try {
                         System.out.println("🔥 Before selector.select(products, intent");
-                        selection = selector.select(products, intent);
+                        // 🔥 Call AI ranking
+
+                        aiMeta = aiRankingService.rankWithMeta(query, rankedProducts);
+
+                        List<Product> aiRanked = (List<Product>) aiMeta.get("ranked");
+
+                        if (aiRanked != null && !aiRanked.isEmpty()) {
+                            rankedProducts = aiRanked;
+                        }
+// 🔥 Extract ranked list
+
+
+                        System.out.println("🧪 [SELECTOR INPUT]");
+                        rankedProducts.stream().limit(10)
+                                .forEach(p -> System.out.println("SRC=" + p.getSource()));
+                        selection = selector.select(rankedProducts, intent);
+
+                        System.out.println("🧪 [SELECTOR OUTPUT]");
+                        System.out.println("BEST=" + ((Product)selection.get("bestPick")).getSource());
+                        System.out.println("CHEAP=" + ((Product)selection.get("cheapest")).getSource());
+
+                        System.out.println("🧪 [AFTER AI RANK]");
+                        rankedProducts.stream().limit(20)
+                                .forEach(p -> System.out.println("SRC=" + p.getSource() + " | " + p.getName()));
 
                         if (selection == null || selection.isEmpty()) {
 
@@ -313,14 +346,23 @@ return Flux.create(emitter -> {
 
                             Product best = products.stream()
                                     .filter(p -> p.getPrice() > 0)
-                                    .max(Comparator.comparingDouble(p -> p.getRating() * p.getTrustScore()))
+                                    .max(Comparator
+                                            .comparingDouble((Product p) ->
+                                                    (p.getRating() * p.getTrustScore()) / p.getPrice()
+                                            )
+                                            .thenComparing(Product::getRating)
+                                            .thenComparing(Product::getPrice)
+                                            .thenComparing(Product::getSource)
+                                    )
                                     .orElse(null);
-
                             Product cheapest = products.stream()
                                     .filter(p -> p.getPrice() > 0)
-                                    .min(Comparator.comparingDouble(Product::getPrice))
+                                    .min(Comparator
+                                            .comparingDouble(Product::getPrice)
+                                            .thenComparing(Product::getRating)
+                                            .thenComparing(Product::getSource)
+                                    )
                                     .orElse(null);
-
                             selection = new HashMap<>();
                             selection.put("bestPick", best);
                             selection.put("cheapest", cheapest);
@@ -335,19 +377,30 @@ return Flux.create(emitter -> {
 
                     // 🔥 FINAL SAFETY
                     if (selection.get("bestPick") == null && !products.isEmpty()) {
-                        selection.put("bestPick", products.get(0));
+                        selection.put("bestPick", rankedProducts.get(0));
                     }
 
                     System.out.println("🔥 Before AI call");
 
                     try {
-
+                        System.out.println("🧪 [BEFORE AI RANK]");
+                        products.stream()
+                                .collect(Collectors.groupingBy(Product::getSource, Collectors.counting()))
+                                .forEach((k,v) -> System.out.println("SRC=" + k + " COUNT=" + v));
                         // 🔥 FIX 2: ASSIGN (NOT DECLARE)
-                        aiMeta = aiRankingService.rankWithMeta(query, products);
 
+                        aiMeta = aiRankingService.rankWithMeta(query, rankedProducts);
                         // 🔥 override with AI
-                        selection.put("bestPick", aiMeta.get("bestPick"));
-                        selection.put("cheapest", aiMeta.get("cheaper"));
+                        Product aiBest = (Product) aiMeta.get("bestPick");
+                        Product aiCheap = (Product) aiMeta.get("cheaper");
+
+                        if (aiBest != null) {
+                            selection.put("bestPick", aiBest);
+                        }
+
+                        if (aiCheap != null) {
+                            selection.put("cheapest", aiCheap);
+                        }
 
                         // 🔥 explanation
                         explanation = (String) aiMeta.getOrDefault(
@@ -367,15 +420,20 @@ return Flux.create(emitter -> {
                     }
 
                     Map<String, Object> response = new HashMap<>();
-                    response.put("products", products);
+                    response.put("products", rankedProducts);
                     response.put("recommendation", selection);
                     response.put("explanation", explanation);
                     response.put("confidence", 0.8);
                     response.put("cheaperAlternative", selection.get("cheapest"));
 
+
+
                     // 🔥 FIX 3: ADD THESE (missing earlier)
+                    response.put("why_best_product", aiMeta.get("why_best_product"));
+                    response.put("why_cheaper_product", aiMeta.get("why_cheaper_product"));
                     response.put("who_should_buy_best", aiMeta.get("who_should_buy_best"));
                     response.put("who_should_buy_cheaper", aiMeta.get("who_should_buy_cheaper"));
+
                     System.out.println("🔥 Bye Cheapr"+aiMeta.get("who_should_buy_cheaper"));
                     ObjectMapper mapper = new ObjectMapper();
                     String json = mapper.writeValueAsString(response);

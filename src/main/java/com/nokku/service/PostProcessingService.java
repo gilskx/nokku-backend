@@ -49,7 +49,12 @@ public class PostProcessingService {
         return products.stream()
                 .filter(p -> {
                     String name = p.getName() == null ? "" : p.getName().toLowerCase();
-                    return tokens.stream().anyMatch(name::contains);
+                    long matchCount = tokens.stream()
+                            .filter(name::contains)
+                            .count();
+
+// allow loose match for short queries
+                    return true;
                 })
                 .toList();
     }

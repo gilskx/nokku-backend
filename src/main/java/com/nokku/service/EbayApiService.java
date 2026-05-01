@@ -67,7 +67,7 @@ public class EbayApiService {
             }
 
             List<Map> items = (List<Map>) response.get("itemSummaries");
-
+            System.out.println("🧪 EBAY RAW RESPONSE: " + response);
             for (Map item : items) {
 
                 try {
