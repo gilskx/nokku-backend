@@ -38,6 +38,30 @@ public class AiRankingService {
         Map<String, Object> result = new HashMap<>();
 
         try {
+            // ✅ Remove invalid price products first
+            products = products.stream()
+                    .filter(p -> p.getPrice() > 0)
+                    .toList();
+
+// ✅ Dynamic min/max from current dataset
+            double minPrice = products.stream()
+                    .mapToDouble(Product::getPrice)
+                    .min()
+                    .orElse(0);
+
+            double maxPrice = products.stream()
+                    .mapToDouble(Product::getPrice)
+                    .max()
+                    .orElse(0);
+
+// ✅ Stable deterministic scoring
+            products = products.stream()
+                    .sorted((a, b) -> Double.compare(
+                            calculateScore(b, minPrice, maxPrice),
+                            calculateScore(a, minPrice, maxPrice)
+                    ))
+                    .limit(30) // optional safety limit
+                    .toList();
             String prompt = buildPrompt(query, products);
 
             RestTemplate restTemplate = new RestTemplate();
@@ -349,7 +373,34 @@ private String getSourceType(String source) {
         // ✅ Very lightweight category similarity
         return containsLaptopKeyword(name);
     }
+    private double calculateScore(Product p,
+                                  double minPrice,
+                                  double maxPrice) {
 
+        // ✅ Rating weight
+        double ratingScore = p.getRating() * 0.6;
+
+        // ✅ Relative price score (normalized)
+        double priceScore = 0;
+
+        if (maxPrice > minPrice) {
+
+            priceScore =
+                    (maxPrice - p.getPrice()) /
+                            (maxPrice - minPrice);
+
+            priceScore *= 0.3;
+        }
+
+        // ✅ Source trust
+        double trustScore = switch (getSourceType(p.getSource())) {
+            case "TRUSTED" -> 0.1;
+            case "MARKETPLACE" -> 0.03;
+            default -> 0.05;
+        };
+
+        return ratingScore + priceScore + trustScore;
+    }
     private boolean containsLaptopKeyword(String text) {
 
         return text.contains("laptop") ||
@@ -571,7 +622,10 @@ private String getSourceType(String source) {
 
 // Sort by list size ASC (small sources first → fairness)
            // lists.sort(Comparator.comparingInt(List::size));
-            Collections.shuffle(lists);
+          //  Collections.shuffle(lists);
+            lists.sort(Comparator.comparing(
+                    l -> l.isEmpty() ? "" : l.get(0).getSource()
+            ));
 // ✅ FIX 3 — prevent one source domination
             Map<String, Integer> sourceCount = new HashMap<>();
             int MIN_PER_SOURCE = 4;
