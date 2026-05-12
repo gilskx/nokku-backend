@@ -9,7 +9,8 @@ public class Product implements Serializable {
     private String link;
     private double trustScore;
     private String image;
-
+    private Integer deliveryDays;   //  / online
+    private Double distanceKm;      //  / local
     // 🔥 New fields
     private int reviewCount;
     private String deliveryType; // SAME_DAY / NEXT_DAY / STANDARD
@@ -81,7 +82,13 @@ public class Product implements Serializable {
     public String getDeliveryType() {
         return deliveryType;
     }
+    public Integer getDeliveryDays() {
+        return deliveryDays;
+    }
 
+    public void setDeliveryDays(Integer deliveryDays) {
+        this.deliveryDays = deliveryDays;
+    }
     // 🔥 Optional setters (future use)
     public void setReviewCount(int reviewCount) {
         this.reviewCount = reviewCount;

@@ -327,7 +327,43 @@ private String getSourceType(String source) {
 
     return "OTHER";
 }
+    private boolean isRelevantProduct(String bestName, Product candidate) {
 
+        if (candidate == null || candidate.getName() == null) {
+            return false;
+        }
+
+        String name = candidate.getName().toLowerCase();
+
+        // 🚫 Reject obvious junk
+        if (name.contains("magazine") ||
+                name.contains("report") ||
+                name.contains("pdf") ||
+                name.contains("book") ||
+                name.contains("guide") ||
+                name.contains("manual")) {
+
+            return false;
+        }
+
+        // ✅ Very lightweight category similarity
+        return containsLaptopKeyword(name);
+    }
+
+    private boolean containsLaptopKeyword(String text) {
+
+        return text.contains("laptop") ||
+                text.contains("macbook") ||
+                text.contains("notebook") ||
+                text.contains("thinkpad") ||
+                text.contains("chromebook");
+    }
+
+    private String querySafe(Product p) {
+        return p != null && p.getName() != null
+                ? p.getName().toLowerCase()
+                : "";
+    }
 // =========================================================
 // 🔥 AI RESPONSE PARSER (NEW CORE)
 // =========================================================
@@ -481,11 +517,36 @@ private String getSourceType(String source) {
             if (cheapIdx < 0 || cheapIdx >= products.size()) cheapIdx = 1;
 
             Product best = products.get(bestIdx);
+            Product cheaper = null;
 
-            Product cheaper = products.stream()
-                    .filter(p -> p.getPrice() > 0 && p.getPrice() < best.getPrice())
-                    .min(Comparator.comparingDouble(Product::getPrice))
-                    .orElse(null);
+// ✅ First trust AI cheaperIndex
+            if (cheapIdx >= 0 &&
+                    cheapIdx < products.size() &&
+                    cheapIdx != bestIdx) {
+
+                Product aiCheap = products.get(cheapIdx);
+
+                // ✅ Basic validation
+                if (aiCheap.getPrice() > 0 &&
+                        aiCheap.getPrice() < best.getPrice() &&
+                        isRelevantProduct(querySafe(best), aiCheap)) {
+
+                    cheaper = aiCheap;
+                }
+            }
+
+// ✅ Fallback logic (existing behavior preserved)
+            if (cheaper == null) {
+
+                cheaper = products.stream()
+                        .filter(p ->
+                                p.getPrice() > 0 &&
+                                        p.getPrice() < best.getPrice() &&
+                                        isRelevantProduct(querySafe(best), p)
+                        )
+                        .min(Comparator.comparingDouble(Product::getPrice))
+                        .orElse(null);
+            }
 
             // 🔥 RANKED LIST (NO BIAS)
             List<Product> ranked = new ArrayList<>();

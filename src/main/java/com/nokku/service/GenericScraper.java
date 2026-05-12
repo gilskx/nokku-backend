@@ -156,14 +156,32 @@ public class GenericScraper {
                     System.out.println("💰 Price: " + price);
                     System.out.println("⭐ Rating: " + rating);
 
-                    results.add(new Product(
+                    Product product = new Product(
                             name,
                             price,
                             rating,
                             source,
                             link,
                             image
-                    ));
+                    );
+
+// 🚚 Extract delivery info (Amazon only)
+                    if ("amazon".equalsIgnoreCase(source)) {
+
+                        String deliveryText = item.select("span:contains(delivery), span:contains(Get it)").text();
+
+                        int days = extractDeliveryDays(deliveryText);
+                        Integer deliveryDays;
+                        if (days > 0) {
+                            product.setDeliveryDays(days);
+                        } else {
+                            product.setDeliveryDays(3); // fallback
+                        }
+
+                        System.out.println("🚚 Delivery: " + deliveryText + " → " + days + " days");
+                    }
+
+                    results.add(product);
 
                 } catch (Exception ignored) {}
             }
@@ -174,6 +192,33 @@ public class GenericScraper {
         }
 
         return results;
+    }
+    private int extractDeliveryDays(String text) {
+
+        if (text == null || text.isEmpty()) return 0;
+
+        text = text.toLowerCase();
+
+        if (text.contains("tomorrow")) return 1;
+        if (text.contains("today")) return 0;
+
+        // Handle "3-5 days"
+        try {
+            if (text.matches(".*\\d+[-–]\\d+.*")) {
+                String range = text.replaceAll("[^0-9\\-–]", "");
+                String[] parts = range.split("[-–]");
+                return Integer.parseInt(parts[0]); // take min
+            }
+
+            // Handle "3 days"
+            String num = text.replaceAll("[^0-9]", "");
+            if (!num.isEmpty()) {
+                return Integer.parseInt(num);
+            }
+
+        } catch (Exception ignored) {}
+
+        return 0;
     }
 
     private String extractImage(Element item, String selector) {
